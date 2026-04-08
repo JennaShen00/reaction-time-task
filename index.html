@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reaction Time Experiment</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+    <style>
+        /* General Reset and Body Styling */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: Arial, sans-serif;
+            overflow: hidden; 
+            background-color: #f4f4f9;
+        }
+
+        /* Screens */
+        .screen {
+            display: none; /* All screens hidden by default */
+            width: 100vw;
+            height: 100vh;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+        }
+
+        /* Screen 1: Welcome */
+        #welcome-screen {
+            display: flex; /* Visible first */
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 90%;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            font-size: 16px;
+            margin: 20px 0;
+            width: 80%;
+            max-width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Screen 2: Task Screen */
+        #task-screen {
+            background-color: #ffffff;
+            display: none;
+        }
+
+        #target-circle {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            background-color: #ff4757;
+            border-radius: 50%;
+            cursor: pointer;
+            display: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        /* Screen 3: Results & Loading */
+        #results-screen {
+            background-color: #f4f4f9;
+        }
+        
+        .chart-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 20px auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="welcome-screen" class="screen">
+        <div class="container">
+            <h2>Reaction Time Task</h2>
+            <p>Please enter your Participant ID to begin.</p>
+            <p><i>(If left blank, a random ID will be generated)</i></p>
+            <input type="text" id="participant-id" placeholder="e.g., P001">
+            <br>
+            <button onclick="startExperiment()">Start Task</button>
+        </div>
+    </div>
+
+    <div id="task-screen" class="screen" style="display: none;">
+        <div id="target-circle" onclick="circleClicked()"></div>
+    </div>
+
+    <div id="results-screen" class="screen">
+        <div class="container">
+            <h2 id="status-text">Saving data... Please wait.</h2>
+            <div id="chart-wrapper" class="chart-container" style="display: none;">
+                <p>Your Average Reaction Time: <strong id="user-avg-display"></strong> ms</p>
+                <canvas id="histogramCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwMY5KlBaRlGQY-GA4UxwZUHMrPALJyty8-QS7pJaLiWj2arB1iP3xfmtwBrDBiyky9BQ/exec";
+        const TOTAL_TRIALS = 10;
+        const DELAY_MS = 500;
+        const CIRCLE_SIZE = 100;
+
+        // State Variables
+        let participantId = "";
+        let currentTrial = 0;
+        let trialStartTime = 0;
+        let experimentData = [];
+
+        // DOM Elements
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const taskScreen = document.getElementById('task-screen');
+        const resultsScreen = document.getElementById('results-screen');
+        const targetCircle = document.getElementById('target-circle');
+        const statusText = document.getElementById('status-text');
+        const chartWrapper = document.getElementById('chart-wrapper');
+        const userAvgDisplay = document.getElementById('user-avg-display');
+
+        function generateRandomID() {
+            return 'ID_' + Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        function startExperiment() {
+            const inputId = document.getElementById('participant-id').value.trim();
+            participantId = inputId !== "" ? inputId : generateRandomID();
+
+            welcomeScreen.style.display = "none";
+            taskScreen.style.display = "block";
+
+            setTimeout(showCircle, DELAY_MS);
+        }
+
+        function showCircle() {
+            const maxX = window.innerWidth - CIRCLE_SIZE;
+            const maxY = window.innerHeight - CIRCLE_SIZE;
+
+            const randomX = Math.floor(Math.random() * maxX);
+            const randomY = Math.floor(Math.random() * maxY);
+
+            targetCircle.style.left = randomX + "px";
+            targetCircle.style.top = randomY + "px";
+            targetCircle.style.display = "block";
+
+            trialStartTime = performance.now();
+        }
+
+        function circleClicked() {
+            const clickTime = performance.now();
+            const reactionTime = Math.round(clickTime - trialStartTime);
+
+            targetCircle.style.display = "none";
+            currentTrial++;
+
+            experimentData.push({
+                Participant_ID: participantId,
+                Trial_Number: currentTrial,
+                Reaction_Time: reactionTime
+            });
+
+            if (currentTrial < TOTAL_TRIALS) {
+                setTimeout(showCircle, DELAY_MS);
+            } else {
+                finishExperiment();
+            }
+        }
+
+        async function finishExperiment() {
+            taskScreen.style.display = "none";
+            resultsScreen.style.display = "flex";
+            
+            // 1. Submit Data
+            statusText.innerText = "Saving data... Please wait.";
+            for (let i = 0; i < experimentData.length; i++) {
+                try {
+                    await fetch(WEB_APP_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify(experimentData[i])
+                    });
+                } catch (error) {
+                    console.error("Error submitting trial " + (i + 1), error);
+                }
+            }
+
+            // 2. Calculate User Average
+            const totalRT = experimentData.reduce((sum, trial) => sum + trial.Reaction_Time, 0);
+            const userAverage = Math.round(totalRT / TOTAL_TRIALS);
+            userAvgDisplay.innerText = userAverage;
+
+            // 3. Fetch Historical Data & Plot
+            statusText.innerText = "Fetching results...";
+            await fetchAndPlotData(userAverage);
+        }
+
+        async function fetchAndPlotData(userAverage) {
+            try {
+                const response = await fetch(WEB_APP_URL);
+                let historicalRTs = await response.json();
+
+                // Mix in the user's current 10 trials locally just in case 
+                // the Google Sheet hasn't fully updated the POSTs yet
+                const userRTs = experimentData.map(d => d.Reaction_Time);
+                const allData = historicalRTs.concat(userRTs);
+
+                plotHistogram(allData, userAverage);
+                
+                statusText.innerText = "Experiment Complete!";
+                chartWrapper.style.display = "block";
+
+            } catch (error) {
+                console.error("Error fetching historical data:", error);
+                statusText.innerText = "Experiment Complete! (Chart failed to load)";
+            }
+        }
+
+        function plotHistogram(data, userAverage) {
+            // Setup Binning (e.g., 50ms buckets)
+            const BIN_SIZE = 50;
+            const minRT = Math.floor(Math.min(...data) / BIN_SIZE) * BIN_SIZE;
+            const maxRT = Math.ceil(Math.max(...data) / BIN_SIZE) * BIN_SIZE;
+            
+            let bins = {};
+            // Initialize bins
+            for (let i = minRT; i <= maxRT; i += BIN_SIZE) {
+                bins[i] = 0;
+            }
+            // Count frequencies
+            data.forEach(rt => {
+                let bin = Math.floor(rt / BIN_SIZE) * BIN_SIZE;
+                if (bins[bin] !== undefined) bins[bin]++;
+            });
+
+            const labels = Object.keys(bins).map(k => `${k}ms`);
+            const frequencies = Object.values(bins);
+
+            // Find which bin the user belongs in for the annotation placement
+            const userBin = Math.floor(userAverage / BIN_SIZE) * BIN_SIZE;
+            const userBinLabel = `${userBin}ms`;
+
+            const ctx = document.getElementById('histogramCanvas').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Frequency of Reaction Times',
+                        data: frequencies,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Reaction Time (ms)' } },
+                        y: { title: { display: true, text: 'Number of Trials' }, beginAtZero: true }
+                    },
+                    plugins: {
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    scaleID: 'x',
+                                    value: userBinLabel, // Places line on the user's specific bin
+                                    borderColor: 'rgba(255, 99, 132, 1)',
+                                    borderWidth: 3,
+                                    borderDash: [5, 5],
+                                    label: {
+                                        content: 'Your Avg',
+                                        display: true,
+                                        position: 'start',
+                                        backgroundColor: 'rgba(255, 99, 132, 0.8)'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
